@@ -1,0 +1,540 @@
+<title>쌍정 일정함</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* 교무수첩 같은 앱: 칠판 초록 + 형광펜 노랑, 위에는 검색·학년 고정, 아래로 날짜별 일정 */
+:root {
+  --bg: #f3f6f5; --surface: #ffffff; --sunk: #e9eeec; --ink: #17302b; --muted: #5b6e69; --line: #d5dfdc;
+  --accent: #0d6a5a; --accent-ink: #ffffff; --marker: #f6d35b; --marker-ink: #3a2e00; --danger: #b3402f;
+  --g1: #d9485f; --g2: #e07b22; --g3: #b59000; --g4: #2f9a4a; --g5: #2b7bd0; --g6: #7a4fc9;
+  --gstaff: #4d5b58; --gparent: #b0478f; --gspecial: #1f8d93; --gcommon: #7c8a86;
+  --f-display: "Do Hyeon", "IBM Plex Sans KR", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1816; --surface: #16221f; --sunk: #1d2b28; --ink: #e3ece9; --muted: #93a7a1; --line: #2a3a36;
+  --accent: #4fc3a9; --accent-ink: #062b23; --marker: #e7c34a; --marker-ink: #2a2100; --danger: #f08a77;
+  --g1: #f2788b; --g2: #f3a35a; --g3: #e2c04a; --g4: #66c97f; --g5: #6aa9ee; --g6: #a98bea;
+  --gstaff: #a3b3af; --gparent: #e486c6; --gspecial: #5ccbd1; --gcommon: #8d9c98; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f1816; --surface: #16221f; --sunk: #1d2b28; --ink: #e3ece9; --muted: #93a7a1; --line: #2a3a36;
+  --accent: #4fc3a9; --accent-ink: #062b23; --marker: #e7c34a; --marker-ink: #2a2100; --danger: #f08a77;
+  --g1: #f2788b; --g2: #f3a35a; --g3: #e2c04a; --g4: #66c97f; --g5: #6aa9ee; --g6: #a98bea;
+  --gstaff: #a3b3af; --gparent: #e486c6; --gspecial: #5ccbd1; --gcommon: #8d9c98; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font: 15px/1.55 var(--f-body); -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 760px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* 상단 고정 */
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+header.top .wrap { padding-block: 12px 10px; display: grid; gap: 10px; }
+.brand { display: flex; align-items: baseline; gap: 10px; justify-content: space-between; }
+.brand h1 { margin: 0; font: 26px/1 var(--f-display); letter-spacing: -0.01em; }
+.brand h1 span { color: var(--accent); }
+.brand small { color: var(--muted); font-size: 12px; }
+.search { position: relative; }
+.search input { width: 100%; height: 44px; border-radius: 22px; border: 1px solid var(--line); background: var(--sunk); padding: 0 44px 0 42px; font-size: 16px; }
+.search input:focus { border-color: var(--accent); background: var(--surface); outline: none; }
+.search svg { position: absolute; left: 14px; top: 13px; width: 18px; height: 18px; stroke: var(--muted); fill: none; stroke-width: 2; }
+.search .clear { position: absolute; right: 6px; top: 6px; width: 32px; height: 32px; border-radius: 16px; border: 0; background: transparent; color: var(--muted); font-size: 18px; }
+.suggest { position: absolute; left: 0; right: 0; top: 48px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: 0 10px 30px rgb(0 0 0 / .12); overflow: hidden; z-index: 5; }
+.suggest button { display: flex; gap: 8px; width: 100%; text-align: left; padding: 10px 14px; border: 0; background: none; border-bottom: 1px solid var(--line); }
+.suggest button:last-child { border-bottom: 0; }
+.suggest button:hover, .suggest button.on { background: var(--sunk); }
+.suggest em { font-style: normal; color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
+
+.chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.chip i { width: 8px; height: 8px; border-radius: 50%; background: var(--c, var(--gcommon)); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+nav.tabs { border-top: 1px solid var(--line); }
+.search input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+nav.tabs .wrap { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+nav.tabs button { flex: none; border: 0; background: none; padding: 10px 10px 9px; font-weight: 600; font-size: 14px; color: var(--muted); border-bottom: 3px solid transparent; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--accent); }
+
+main .wrap { padding-block: 16px 64px; display: grid; gap: 18px; }
+.muted { color: var(--muted); }
+.status { font-size: 12px; color: var(--muted); }
+.status b { color: var(--danger); font-weight: 600; }
+
+/* 일정 */
+.dday { display: flex; gap: 8px; flex-wrap: wrap; }
+.dday span { font-size: 13px; padding: 4px 10px; border-radius: 6px; background: var(--sunk); }
+.dday b { font-family: var(--f-mono); font-weight: 500; margin-left: 4px; }
+.weekbar { display: flex; align-items: center; gap: 8px; }
+.weekbar h2 { margin: 0; font: 22px/1.1 var(--f-display); flex: 1; min-width: 0; }
+.iconbtn { height: 36px; min-width: 36px; padding: 0 10px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); font-weight: 600; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 0 12px; height: 34px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+.ongoing { border: 1px dashed var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 6px; }
+.ongoing h3 { margin: 0; font-size: 12px; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+
+.day { display: grid; grid-template-columns: 66px 1fr; gap: 12px; }
+.day + .day { border-top: 1px solid var(--line); padding-top: 14px; }
+.date { text-align: center; padding-top: 2px; }
+.date .n { font: 24px/1 var(--f-display); white-space: nowrap; display: block; font-variant-numeric: tabular-nums; }
+.date .w { font-size: 12px; color: var(--muted); }
+.date.sun .w, .date.hol .w, .date.hol .n { color: var(--danger); }
+.date.sat .w { color: var(--g5); }
+.day.today .date .n { background: var(--marker); color: var(--marker-ink); border-radius: 8px; padding: 4px 0; }
+.day.today .date .w::after { content: "오늘"; display: block; color: var(--accent); font-weight: 600; }
+.evs { display: grid; gap: 8px; min-width: 0; }
+.note { font-size: 12px; color: var(--muted); }
+.empty { color: var(--muted); font-size: 14px; padding: 6px 0; }
+.ev { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 6px; min-width: 0; }
+.ev.hol { background: transparent; border-style: dashed; color: var(--danger); font-weight: 600; }
+.ev .t { overflow-wrap: anywhere; }
+.ev .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); }
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 4px; font-size: 11.5px; font-weight: 600; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+.span { font-family: var(--f-mono); font-size: 11.5px; }
+mark { background: var(--marker); color: var(--marker-ink); border-radius: 2px; padding: 0 1px; }
+
+/* 검색 결과 */
+.sec h2 { margin: 0 0 8px; font: 20px/1.2 var(--f-display); display: flex; gap: 8px; align-items: baseline; }
+.sec h2 small { font: 13px var(--f-body); color: var(--muted); }
+.hit { display: grid; grid-template-columns: 72px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.hit .d { font-family: var(--f-mono); font-size: 13px; color: var(--muted); padding-top: 2px; }
+.hit .d.today { color: var(--accent); font-weight: 600; }
+.rowhit { padding: 10px 0; border-top: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.rowhit small { color: var(--accent); font-weight: 600; font-size: 12px; }
+button.linkish { border: 0; background: none; padding: 0; color: var(--accent); font-weight: 600; }
+
+/* 표 */
+.sub { display: flex; gap: 6px; flex-wrap: wrap; }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; font-size: 13px; min-width: 100%; }
+td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; white-space: pre-line; min-width: 2.5em; }
+td.h { background: var(--sunk); font-weight: 600; }
+td.blank { border-color: transparent; }
+td a { color: var(--accent); }
+.links { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.links a { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: inherit; text-decoration: none; }
+.links a:hover { border-color: var(--accent); }
+.links a b { font-weight: 600; }
+.links a span { font-size: 12px; color: var(--muted); }
+
+/* 보안 · 알림 */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; }
+.panel h2 { margin: 0; font: 22px/1.2 var(--f-display); }
+.panel p { margin: 0; }
+.code { display: flex; gap: 8px; flex-wrap: wrap; }
+.code input { width: 9em; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--sunk); text-align: center; font: 22px var(--f-mono); letter-spacing: .4em; }
+.btn { height: 44px; padding: 0 18px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.ghost { background: var(--sunk); color: var(--ink); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-top: 1px solid var(--line); }
+.toggle input { flex: none; width: 20px; height: 20px; accent-color: var(--accent); margin-top: 2px; }
+.toggle small { display: block; color: var(--muted); }
+.msg { font-size: 14px; padding: 10px 12px; border-radius: 8px; background: var(--sunk); }
+.msg.err { color: var(--danger); }
+ol.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1>쌍정 <span>일정함</span></h1>
+      <small id="updated">불러오는 중…</small>
+    </div>
+    <div class="search" role="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="일정, 담당자, 특별실, 내선번호 검색" autocomplete="off" aria-label="검색">
+      <button class="clear" id="qclear" aria-label="검색어 지우기" hidden>×</button>
+      <div class="suggest" id="suggest" hidden></div>
+    </div>
+    <div class="chips" id="filter" aria-label="학년 선택"></div>
+  </div>
+  <nav class="tabs" role="tablist"><div class="wrap" id="tabs"></div></nav>
+</header>
+
+<main><div class="wrap" id="view"></div></main>
+
+<script>
+/*__BOOT__*/
+</script>
+<script>
+/*__PARSE__*/
+
+const DEMO = !!window.__DEMO__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('sj.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('sj.' + k, JSON.stringify(v)); } catch {} },
+};
+const COLOR = { '1': '--g1', '2': '--g2', '3': '--g3', '4': '--g4', '5': '--g5', '6': '--g6', staff: '--gstaff', parent: '--gparent', special: '--gspecial', common: '--gcommon' };
+const SHORT = { staff: '교직원', parent: '학부모', special: '통합', common: '공통' };
+const TABS = [['sched', '일정'], ['ref', '업무 참고'], ['lock', '보안'], ['alarm', '알림']];
+
+let DATA = null, EVENTS = [], NOTES = [], SECURE = null;
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const TODAY = ymd(today);
+const mondayOf = d => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+const st = {
+  tab: 'sched', view: LS.get('view', 'week'), filter: LS.get('filter', []), q: '',
+  week: mondayOf(today), month: new Date(today.getFullYear(), today.getMonth(), 1), ref: null,
+};
+const qd = new URLSearchParams(location.search).get('d');
+if (qd && /^\d{4}-\d{2}-\d{2}$/.test(qd)) { const [y, m, d] = qd.split('-').map(Number); st.week = mondayOf(new Date(y, m - 1, d)); st.view = 'week'; }
+
+/* ---------- 자료 ---------- */
+function setData(d) {
+  DATA = d;
+  const r = parseSchedule(d.schedule, d.year || today.getFullYear());
+  EVENTS = r.events; NOTES = r.notes;
+  const at = d.updatedAt ? new Date(d.updatedAt) : null;
+  $('#updated').textContent = at ? `시트 반영 ${at.getMonth() + 1}.${at.getDate()} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` : '';
+  buildVocab();
+  render();
+}
+async function load() {
+  if (DEMO) return setData(window.__DEMO__);
+  const cached = LS.get('data', null);
+  if (cached) setData(cached);
+  try {
+    const res = await fetch('/api/data', { cache: 'no-store' });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.status);
+    LS.set('data', d); setData(d);
+  } catch (e) {
+    if (!cached) { $('#updated').textContent = ''; $('#view').innerHTML = `<p class="msg err">자료를 불러오지 못했습니다. ${esc(e.message)}</p>`; }
+    else $('#updated').innerHTML = '<b>오프라인</b> · 저장된 자료';
+  }
+}
+
+/* ---------- 필터 ---------- */
+function visible(ev) {
+  if (!st.filter.length) return true;
+  return ev.groups.some(g => st.filter.includes(g) || g === 'common');
+}
+function renderFilter() {
+  const all = `<button class="chip" data-g="" aria-pressed="${!st.filter.length}">전체</button>`;
+  $('#filter').innerHTML = all + GROUPS.filter(g => g.id !== 'common').map(g =>
+    `<button class="chip" data-g="${g.id}" style="--c:var(${COLOR[g.id]})" aria-pressed="${st.filter.includes(g.id)}"><i></i>${g.label}</button>`).join('');
+}
+$('#filter').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const g = b.dataset.g;
+  st.filter = !g ? [] : (st.filter.includes(g) ? st.filter.filter(x => x !== g) : [...st.filter, g]);
+  LS.set('filter', st.filter); renderFilter(); render();
+});
+
+/* ---------- 탭 ---------- */
+function renderTabs() {
+  $('#tabs').innerHTML = TABS.map(([id, label]) => `<button role="tab" data-tab="${id}" aria-selected="${st.tab === id && !st.q}">${label}</button>`).join('');
+}
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  st.tab = b.dataset.tab; setQ(''); window.scrollTo(0, 0);
+});
+
+/* ---------- 일정 그리기 ---------- */
+const tags = ev => ev.groups.length === 0 ? '' : (ev.groups.filter(g => /^\d$/.test(g)).length === 6
+  ? `<span class="tag" style="--c:var(--accent)">전교</span>` + ev.groups.filter(g => !/^\d$/.test(g)).map(tagOne).join('')
+  : ev.groups.map(tagOne).join(''));
+const tagOne = g => `<span class="tag" style="--c:var(${COLOR[g]})">${/^\d$/.test(g) ? g + '학년' : SHORT[g]}</span>`;
+const spanTxt = ev => ev.end ? `<span class="span">~${+ev.end.slice(5, 7)}.${+ev.end.slice(8)}</span>` : '';
+
+function hl(text, q) {
+  const t = esc(text);
+  if (!q) return t;
+  const parts = q.split(/\s+/).filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!parts.length) return t;
+  return t.replace(new RegExp('(' + parts.join('|') + ')', 'gi'), '<mark>$1</mark>');
+}
+function evCard(ev, q = '') {
+  if (ev.holiday) return `<div class="ev hol">${hl(ev.text, q)}</div>`;
+  return `<div class="ev"><div class="t">${hl(ev.text, q)}</div><div class="meta">${tags(ev)}${spanTxt(ev)}${ev.owner ? `<span>· ${hl(ev.owner, q)}</span>` : ''}</div></div>`;
+}
+function dayBlock(key, list, notes, showEmpty) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d), w = dt.getDay();
+  const hol = list.some(e => e.holiday);
+  const cls = ['date', w === 0 ? 'sun' : '', w === 6 ? 'sat' : '', hol ? 'hol' : ''].join(' ');
+  const body = list.length ? list.map(e => evCard(e)).join('') : (showEmpty ? '<div class="empty">일정 없음</div>' : '');
+  return `<section class="day${key === TODAY ? ' today' : ''}" id="d-${key}">
+    <div class="${cls}"><span class="n">${m}.${d}</span><span class="w">${WEEK[w]}요일</span></div>
+    <div class="evs">${notes.length ? `<div class="note">${esc(notes.map(n => n.text).join(' · '))}</div>` : ''}${body}</div></section>`;
+}
+function ddays() {
+  const out = [];
+  const find = re => EVENTS.find(e => re.test(e.text) && e.date >= TODAY);
+  const end = find(/졸업식|종업식/); if (end) out.push(['종업식·졸업식', end.date]);
+  const vac = find(/방학식/); if (vac) out.push(['방학식', vac.date]);
+  const hol = EVENTS.find(e => e.holiday && e.date > TODAY); if (hol) out.push([hol.text, hol.date]);
+  return out.map(([n, d]) => {
+    const [y, m, dd] = d.split('-').map(Number);
+    const diff = Math.round((new Date(y, m - 1, dd) - today) / 864e5);
+    return `<span>${esc(n)} <b>D-${diff}</b></span>`;
+  }).join('');
+}
+function renderSched() {
+  const v = st.view;
+  let head, body;
+  if (v === 'week') {
+    const days = [...Array(7)].map((_, i) => { const d = new Date(st.week); d.setDate(d.getDate() + i); return ymd(d); });
+    const s = days[0], e = days[6];
+    const ongoing = EVENTS.filter(ev => ev.end && ev.date < s && ev.end >= s && visible(ev));
+    head = `${+s.slice(5, 7)}.${+s.slice(8)} – ${+days[4].slice(5, 7)}.${+days[4].slice(8)}`;
+    body = (ongoing.length ? `<div class="ongoing"><h3>진행 중</h3>${ongoing.map(x => evCard(x)).join('')}</div>` : '') +
+      days.map((k, i) => {
+        const list = EVENTS.filter(ev => ev.date === k && visible(ev));
+        const notes = NOTES.filter(n => n.date === k);
+        if (i >= 5 && !list.length) return '';
+        return dayBlock(k, list, notes, true);
+      }).join('');
+  } else {
+    const y = st.month.getFullYear(), m = st.month.getMonth();
+    const pre = `${y}-${String(m + 1).padStart(2, '0')}`;
+    const keys = [...new Set(EVENTS.filter(ev => ev.date.startsWith(pre) && visible(ev)).map(ev => ev.date))].sort();
+    head = `${y}년 ${m + 1}월`;
+    body = keys.length ? keys.map(k => dayBlock(k, EVENTS.filter(ev => ev.date === k && visible(ev)), NOTES.filter(n => n.date === k), false)).join('')
+      : '<p class="empty">이 달에는 선택한 학년 일정이 없습니다.</p>';
+  }
+  const isNow = v === 'week' ? ymd(st.week) === ymd(mondayOf(today)) : (st.month.getFullYear() === today.getFullYear() && st.month.getMonth() === today.getMonth());
+  $('#view').innerHTML = `
+    <div class="dday">${ddays()}</div>
+    <div class="weekbar">
+      <button class="iconbtn" data-nav="-1" aria-label="이전">‹</button>
+      <h2>${head}</h2>
+      ${isNow ? '' : `<button class="iconbtn" data-nav="0">오늘</button>`}
+      <button class="iconbtn" data-nav="1" aria-label="다음">›</button>
+    </div>
+    <div class="row"><div class="seg"><button data-view="week" aria-pressed="${v === 'week'}">주간</button><button data-view="month" aria-pressed="${v === 'month'}">월간</button></div>
+      <span class="status">${st.filter.length ? '선택한 학년 + 학교 공통 일정' : '모든 일정'}</span></div>
+    <div style="display:grid;gap:14px">${body}</div>`;
+  if (v === 'week') { const t = document.getElementById('d-' + (qd || TODAY)); if (t && !renderSched.done) { renderSched.done = 1; setTimeout(() => t.scrollIntoView({ block: 'center' }), 50); } }
+}
+$('#view').addEventListener('click', e => {
+  const nav = e.target.closest('[data-nav]'), vw = e.target.closest('[data-view]');
+  if (nav) {
+    const n = +nav.dataset.nav;
+    if (st.view === 'week') { if (n === 0) st.week = mondayOf(today); else st.week.setDate(st.week.getDate() + 7 * n); }
+    else { st.month = n === 0 ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(st.month.getFullYear(), st.month.getMonth() + n, 1); }
+    render();
+  }
+  if (vw) { st.view = vw.dataset.view; LS.set('view', st.view); render(); }
+});
+
+/* ---------- 표 ---------- */
+function trim(rows) {
+  rows = (rows || []).map(r => (r || []).map(c => String(c ?? '')));
+  let w = 0; rows.forEach(r => r.forEach((c, i) => { if (c.trim()) w = Math.max(w, i + 1); }));
+  rows = rows.map(r => Array.from({ length: w }, (_, i) => r[i] || ''));
+  while (rows.length && !rows[rows.length - 1].some(c => c.trim())) rows.pop();
+  while (rows.length && !rows[0].some(c => c.trim())) rows.shift();
+  // 연속 빈 행은 하나로
+  return rows.filter((r, i) => r.some(c => c.trim()) || (rows[i - 1] && rows[i - 1].some(c => c.trim())));
+}
+// 열 전체가 빈 칸이면 빼기
+function dropEmptyCols(rows) {
+  if (!rows.length) return rows;
+  const keep = rows[0].map((_, i) => rows.some(r => (r[i] || '').trim()));
+  return rows.map(r => r.filter((_, i) => keep[i]));
+}
+const phone = s => esc(s).replace(/(0\d{1,2}-\d{3,4}-\d{4})/g, '<a href="tel:$1">$1</a>');
+function tableHTML(rows, q = '') {
+  rows = dropEmptyCols(trim(rows));
+  if (!rows.length) return '<p class="empty">내용이 없습니다.</p>';
+  const isHead = r => r.filter(c => c.trim()).length <= 1 || /^(구 ?분|월|실 ?명|연번|행 ?사 ?명|내 ?용|순|소속|날짜)$/.test((r.find(c => c.trim()) || '').trim());
+  return `<div class="tablebox"><table>${rows.map(r => `<tr>${r.map(c => {
+    const v = c.trim(); const h = isHead(r) && v;
+    return `<td class="${h ? 'h' : ''}${!v && !r.some(x => x.trim()) ? ' blank' : ''}">${q ? hl(c, q) : phone(c)}</td>`;
+  }).join('')}</tr>`).join('')}</table></div>`;
+}
+function linksHTML() {
+  const L = DATA.links || [];
+  if (!L.length) return '<p class="empty">링크가 없습니다.</p>';
+  return `<div class="links">${L.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener"><b>${esc(l.title)}</b>${l.note ? `<span>${esc(l.note)}</span>` : ''}</a>`).join('')}</div>`;
+}
+function renderRef() {
+  const names = ['링크 모음', ...(DATA.tables || []).map(t => t.name)];
+  if (!names.includes(st.ref)) st.ref = names[0];
+  const t = (DATA.tables || []).find(t => t.name === st.ref);
+  $('#view').innerHTML = `<div class="sub">${names.map(n => `<button class="chip" data-ref="${esc(n)}" aria-pressed="${n === st.ref}">${esc(n)}</button>`).join('')}</div>
+    ${st.ref === '링크 모음' ? linksHTML() : tableHTML(t.rows)}`;
+}
+$('#view').addEventListener('click', e => { const b = e.target.closest('[data-ref]'); if (b) { st.ref = b.dataset.ref; render(); } });
+
+/* ---------- 보안 ---------- */
+let secRef = null;
+function renderLock() {
+  if (SECURE) {
+    const names = SECURE.tables.map(t => t.name);
+    if (!names.includes(secRef)) secRef = names[0];
+    const t = SECURE.tables.find(t => t.name === secRef);
+    $('#view').innerHTML = `<div class="row"><span class="status">이 기기에서 열려 있습니다.</span><button class="linkish" id="relock">다시 잠그기</button></div>
+      <div class="sub">${names.map(n => `<button class="chip" data-sec="${esc(n)}" aria-pressed="${n === secRef}">${esc(n)}</button>`).join('')}</div>
+      ${t ? tableHTML(t.rows) : '<p class="empty">시트에서 받은 보안 자료가 없습니다.</p>'}`;
+    return;
+  }
+  $('#view').innerHTML = `<form class="panel" id="lockform">
+      <h2>보안 자료</h2>
+      <p class="muted">아이디·비밀번호, 도어락, 와이파이, 교직원 비상연락망, 공용 PC 비밀번호가 들어 있습니다. 코드를 입력하면 이 기기에서 바로 열립니다.</p>
+      <div class="code"><input id="code" inputmode="numeric" maxlength="8" autocomplete="off" aria-label="코드"><button class="btn" type="submit">열기</button></div>
+      <div id="lockmsg"></div>
+    </form>`;
+  if (DEMO) $('#lockmsg').innerHTML = '<p class="msg">미리보기에는 보안 자료를 넣지 않았습니다. 학교 사이트에서 코드를 입력하면 열립니다.</p>';
+}
+async function unlock(code, silent) {
+  if (DEMO) return;
+  try {
+    const res = await fetch('/api/secure', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error);
+    SECURE = d; LS.set('code', code); buildVocab(); if (st.tab === 'lock') render();
+  } catch (e) { LS.set('code', null); if (!silent) $('#lockmsg').innerHTML = `<p class="msg err">${esc(e.message)}</p>`; }
+}
+$('#view').addEventListener('submit', e => { if (e.target.id === 'lockform') { e.preventDefault(); unlock($('#code').value.trim()); } });
+$('#view').addEventListener('click', e => {
+  const b = e.target.closest('[data-sec]'); if (b) { secRef = b.dataset.sec; render(); }
+  if (e.target.id === 'relock') { SECURE = null; LS.set('code', null); buildVocab(); render(); }
+});
+
+/* ---------- 알림 ---------- */
+const alarm = LS.get('alarm', { groups: [], daily: true, weekly: true, on: false });
+const urlB64 = s => { const p = '='.repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...b].map(c => c.charCodeAt(0))); };
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+function renderAlarm() {
+  if (!alarm.groups.length) alarm.groups = st.filter.length ? [...st.filter, 'common'] : ['common'];
+  const can = !DEMO && 'serviceWorker' in navigator && 'PushManager' in window;
+  $('#view').innerHTML = `<div class="panel">
+    <h2>학년 일정 알림</h2>
+    <p class="muted">고른 학년의 일정이 있는 평일 아침 7시 30분에 휴대폰으로 알려 드립니다.</p>
+    <div class="chips" id="agroups" style="flex-wrap:wrap">${GROUPS.map(g => `<button class="chip" data-ag="${g.id}" style="--c:var(${COLOR[g.id]})" aria-pressed="${alarm.groups.includes(g.id)}"><i></i>${g.label}</button>`).join('')}</div>
+    <label class="toggle"><input type="checkbox" id="adaily" ${alarm.daily ? 'checked' : ''}><span>당일 아침 알림<small>그날 일정이 있을 때만 옵니다.</small></span></label>
+    <label class="toggle"><input type="checkbox" id="aweekly" ${alarm.weekly ? 'checked' : ''}><span>주간 요약<small>월요일 아침에 이번 주 일정을 한 번에 보냅니다. 월요일에는 이 요약이 당일 알림을 대신합니다.</small></span></label>
+    <div class="row">
+      <button class="btn" id="aon" ${can ? '' : 'disabled'}>${alarm.on ? '설정 저장' : '알림 켜기'}</button>
+      ${alarm.on ? '<button class="btn ghost" id="atest">시험 알림 받기</button><button class="btn ghost" id="aoff">알림 끄기</button>' : ''}
+    </div>
+    <div id="amsg">${DEMO ? '<p class="msg">미리보기에서는 알림을 켤 수 없습니다. 학교 사이트에서 켜 주세요.</p>' : ''}
+      ${!DEMO && isIOS && !standalone ? '<p class="msg">아이폰은 먼저 Safari 공유 버튼 → <b>홈 화면에 추가</b>로 앱을 설치한 뒤, 홈 화면 아이콘으로 열어야 알림을 켤 수 있습니다.</p>' : ''}
+      ${!DEMO && !can && !isIOS ? '<p class="msg err">이 브라우저는 알림을 지원하지 않습니다. 크롬이나 삼성 인터넷에서 열어 주세요.</p>' : ''}</div>
+  </div>
+  <div class="panel"><h2>휴대폰 앱으로 쓰기</h2><ol class="steps">
+    <li>안드로이드: 크롬 메뉴(⋮) → <b>홈 화면에 추가</b></li>
+    <li>아이폰: Safari 공유 버튼 → <b>홈 화면에 추가</b></li>
+    <li>홈 화면 아이콘으로 열고 위에서 알림을 켭니다.</li></ol></div>`;
+}
+const amsg = (t, err) => { $('#amsg').innerHTML = `<p class="msg${err ? ' err' : ''}">${t}</p>`; };
+async function saveAlarm() {
+  alarm.daily = $('#adaily').checked; alarm.weekly = $('#aweekly').checked;
+  if (!alarm.groups.length) return amsg('학년을 하나 이상 골라 주세요.', true);
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (Notification.permission !== 'granted' && (await Notification.requestPermission()) !== 'granted') return amsg('알림 권한이 꺼져 있습니다. 브라우저 설정에서 이 사이트의 알림을 허용해 주세요.', true);
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) { const key = await (await fetch('/api/vapid')).text(); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64(key.trim()) }); }
+    const res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ sub, groups: alarm.groups, daily: alarm.daily, weekly: alarm.weekly }) });
+    if (!res.ok) throw new Error((await res.json()).error);
+    alarm.on = true; LS.set('alarm', alarm); renderAlarm();
+    amsg('저장했습니다. 고른 학년: ' + alarm.groups.map(g => GROUPS.find(x => x.id === g).label).join(', '));
+  } catch (e) { amsg('알림을 켜지 못했습니다. ' + esc(e.message), true); }
+}
+$('#view').addEventListener('click', async e => {
+  const g = e.target.closest('[data-ag]');
+  if (g) { const id = g.dataset.ag; alarm.groups = alarm.groups.includes(id) ? alarm.groups.filter(x => x !== id) : [...alarm.groups, id]; g.setAttribute('aria-pressed', alarm.groups.includes(id)); LS.set('alarm', alarm); }
+  if (e.target.id === 'aon') saveAlarm();
+  if (e.target.id === 'atest') {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    const res = await fetch('/api/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: sub && sub.endpoint }) });
+    amsg(res.ok ? '보냈습니다. 몇 초 안에 알림이 옵니다.' : esc((await res.json()).error), !res.ok);
+  }
+  if (e.target.id === 'aoff') {
+    const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (sub) { await fetch('/api/unsubscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); }
+    alarm.on = false; LS.set('alarm', alarm); renderAlarm(); amsg('알림을 껐습니다.');
+  }
+});
+
+/* ---------- 검색 ---------- */
+let VOCAB = [];
+const norm = s => String(s).toLowerCase().replace(/\s+/g, '');
+function allTables() { return [...(DATA?.tables || []), ...(SECURE?.tables || []).map(t => ({ ...t, secure: true }))]; }
+function buildVocab() {
+  const m = new Map();
+  const add = (w, kind) => { w = w.trim(); if (w.length < 2 || w.length > 30 || /^[\d\s.\-:~()]+$/.test(w)) return; const k = norm(w); if (!m.has(k)) m.set(k, { w, kind, n: 0 }); m.get(k).n++; };
+  EVENTS.forEach(e => { add(e.text.split(/[(\[]/)[0], '일정'); e.owner.split(/[,\n]/).forEach(o => add(o.replace(/\(.*\)/, ''), '담당')); });
+  allTables().forEach(t => t.rows.forEach(r => r.forEach(c => String(c).split('\n').forEach(x => { if (x.trim().length <= 20) add(x, t.name); }))));
+  (DATA?.links || []).forEach(l => add(l.title, '링크'));
+  VOCAB = [...m.values()];
+}
+let sIdx = -1;
+function renderSuggest() {
+  const q = norm($('#q').value), box = $('#suggest');
+  if (!q) { box.hidden = true; return; }
+  const list = VOCAB.filter(v => norm(v.w).includes(q) && norm(v.w) !== q)
+    .sort((a, b) => (norm(a.w).startsWith(q) ? 0 : 1) - (norm(b.w).startsWith(q) ? 0 : 1) || b.n - a.n).slice(0, 7);
+  sIdx = -1;
+  box.hidden = !list.length;
+  box.innerHTML = list.map(v => `<button type="button" data-s="${esc(v.w)}">${hl(v.w, $('#q').value.trim())}<em>${esc(v.kind)}</em></button>`).join('');
+}
+function setQ(v) { $('#q').value = v; st.q = v.trim(); $('#qclear').hidden = !v; $('#suggest').hidden = true; render(); }
+let tmr;
+$('#q').addEventListener('input', () => { renderSuggest(); clearTimeout(tmr); tmr = setTimeout(() => { st.q = $('#q').value.trim(); $('#qclear').hidden = !st.q; render(); }, 180); });
+$('#q').addEventListener('keydown', e => {
+  const items = [...$('#suggest').querySelectorAll('button')];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); sIdx = (sIdx + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; items.forEach((b, i) => b.classList.toggle('on', i === sIdx)); }
+  if (e.key === 'Enter') { e.preventDefault(); setQ(sIdx >= 0 ? items[sIdx].dataset.s : $('#q').value); $('#q').blur(); }
+  if (e.key === 'Escape') $('#suggest').hidden = true;
+});
+$('#suggest').addEventListener('mousedown', e => { const b = e.target.closest('[data-s]'); if (b) { e.preventDefault(); setQ(b.dataset.s); } });
+$('#q').addEventListener('blur', () => setTimeout(() => { $('#suggest').hidden = true; }, 150));
+$('#qclear').addEventListener('click', () => { setQ(''); $('#q').focus(); });
+
+function renderSearch() {
+  const raw = st.q, words = raw.split(/\s+/).filter(Boolean).map(norm);
+  const ok = s => { const n = norm(s); return words.every(w => n.includes(w)); };
+  const ev = EVENTS.filter(e => visible(e) && ok(e.text + ' ' + e.owner + ' ' + fmtDate(e.date)));
+  const up = ev.filter(e => e.date >= TODAY), past = ev.filter(e => e.date < TODAY).reverse();
+  const rows = [];
+  allTables().forEach(t => t.rows.forEach(r => {
+    let cells = r.map(c => String(c).trim()).filter(Boolean);
+    if (!cells.length || !ok(cells.join(' '))) return;
+    // 줄 전체가 길면 검색어가 든 칸과 줄 머리(첫 칸)만 보여 줌
+    if (cells.length > 4) { const hit = cells.filter(c => words.some(w => norm(c).includes(w))); cells = [...new Set([cells[0], ...hit])]; }
+    rows.push({ t, cells });
+  }));
+  const links = (DATA.links || []).filter(l => ok(l.title + ' ' + (l.note || '')));
+  const hitEv = e => `<div class="hit"><div class="d${e.date === TODAY ? ' today' : ''}">${fmtDate(e.date)}</div>${evCard(e, raw)}</div>`;
+  const total = ev.length + rows.length + links.length;
+  $('#view').innerHTML = `<p class="status">“${esc(raw)}” 검색 결과 ${total}건${st.filter.length ? ' · 선택한 학년 안에서' : ''}</p>
+    ${up.length ? `<div class="sec"><h2>다가오는 일정 <small>${up.length}</small></h2>${up.slice(0, 40).map(hitEv).join('')}</div>` : ''}
+    ${links.length ? `<div class="sec"><h2>링크 <small>${links.length}</small></h2><div class="links">${links.map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener"><b>${hl(l.title, raw)}</b>${l.note ? `<span>${esc(l.note)}</span>` : ''}</a>`).join('')}</div></div>` : ''}
+    ${rows.length ? `<div class="sec"><h2>업무 참고 <small>${rows.length}</small></h2>${rows.slice(0, 60).map(x => `<div class="rowhit"><small>${esc(x.t.name)}${x.t.secure ? ' · 보안' : ''}</small><div>${hl(x.cells.join(' · '), raw)}</div></div>`).join('')}</div>` : ''}
+    ${past.length ? `<div class="sec"><h2>지난 일정 <small>${past.length}</small></h2>${past.slice(0, 40).map(hitEv).join('')}</div>` : ''}
+    ${!total ? `<p class="empty">찾는 내용이 없습니다.${st.filter.length ? ' 위에서 <b>전체</b>를 눌러 모든 학년에서 찾아보세요.' : ''}${!SECURE && !DEMO ? ' 비밀번호·연락처는 보안 탭을 연 뒤 검색됩니다.' : ''}</p>` : ''}`;
+}
+
+/* ---------- 그리기 ---------- */
+function render() {
+  renderTabs();
+  if (!DATA) return;
+  if (st.q) return renderSearch();
+  ({ sched: renderSched, ref: renderRef, lock: renderLock, alarm: renderAlarm })[st.tab]();
+}
+renderFilter(); renderTabs();
+load();
+const savedCode = LS.get('code', null);
+if (savedCode) unlock(savedCode, true);
+if (!DEMO && 'serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+</script>
