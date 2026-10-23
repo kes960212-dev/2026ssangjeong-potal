@@ -166,6 +166,28 @@ details.card[open] > summary h3::after { content: " −"; }
 .mini tr.sum td { font-weight: 600; background: var(--sunk); }
 .mini tr.cat td { background: transparent; border-left-color: transparent; border-right-color: transparent; color: var(--accent); font-weight: 600; text-align: left; padding-top: 12px; }
 .box-title { font-weight: 600; font-size: 14px; margin: 0 0 6px; }
+/* 보안 탭 */
+.acc { display: grid; gap: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.acc > div { display: grid; grid-template-columns: minmax(0, 9em) 1fr; gap: 4px 12px; padding: 10px 14px; border-top: 1px solid var(--line); align-items: start; }
+.acc > div:first-child { border-top: 0; }
+.acc .nm { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
+.acc .nm small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+.acc .fs { display: grid; gap: 4px; min-width: 0; }
+.kv { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; min-width: 0; }
+.kv > span:first-child { color: var(--muted); font-size: 12px; min-width: 3.5em; }
+.kv code, .tile code { font-family: var(--f-mono); font-size: 13.5px; background: var(--sunk); padding: 2px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.kv a { color: var(--accent); overflow-wrap: anywhere; }
+.cp { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; height: 26px; padding: 0 8px; font-size: 12px; color: var(--muted); }
+.cp.done { color: var(--accent); border-color: var(--accent); }
+.acc .fs { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.acc.tight > div { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 8px 14px; }
+.acc.tight .fs { justify-content: flex-end; }
+.acc.tight .kv > span:first-child { display: none; }
+@media (max-width: 420px) { .acc:not(.tight) > div { grid-template-columns: 1fr; gap: 6px; } }
+.secsearch { width: 100%; height: 40px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); padding: 0 12px; font-size: 15px; }
+.tile .big { font: 20px/1.2 var(--f-mono); letter-spacing: .02em; overflow-wrap: anywhere; }
+.tile .sub2 code { font-size: 12px; padding: 1px 4px; }
+.wifi { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
 .tile { background: var(--sunk); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; min-width: 0; align-content: start; }
 .models b.key { font-family: var(--f-mono); color: var(--accent); margin-right: 6px; }
@@ -903,7 +925,7 @@ function renderLock() {
     const t = SECURE.tables.find(t => t.name === secRef);
     $('#view').innerHTML = `<div class="row"><span class="status">이 기기에서 열려 있습니다.</span><button class="linkish" id="relock">다시 잠그기</button></div>
       <div class="sub">${names.map(n => `<button class="chip" data-sec="${esc(n)}" aria-pressed="${n === secRef}">${esc(n)}</button>`).join('')}</div>
-      ${t ? tableHTML(t.rows) : '<p class="empty">시트에서 받은 보안 자료가 없습니다.</p>'}`;
+      ${t ? secBody(t) : '<p class="empty">시트에서 받은 보안 자료가 없습니다.</p>'}`;
     return;
   }
   $('#view').innerHTML = `<form class="panel" id="lockform">
@@ -1337,6 +1359,135 @@ $('#view').addEventListener('click', e => {
   ui.draft = { ...ui.draft, ...cur, kind: k, due: cur.due || ui.draft.due || cur.date, date: cur.date || ui.draft.date || TODAY };
   st.tab = k; ui.cform = k === 'collect'; ui.nform = k === 'notice'; ui.cgrades = ui.draft.grades || [];
   render();
+});
+
+
+/* ---------- 보안 탭: 표를 휴대폰에서 바로 쓰는 목록으로 ---------- */
+const cpBtn = v => `<button type="button" class="cp" data-copy="${esc(v)}">복사</button>`;
+const kv = (k, v, copy = true) => v ? `<div class="kv"><span>${esc(k)}</span>${/^https?:\/\//.test(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>` : `<code>${esc(v)}</code>${copy ? cpBtn(v) : ''}`}</div>` : '';
+const rowsOf = rows => (rows || []).map(r => (r || []).map(c => String(c ?? '').trim()));
+const PHONE = /0\d{1,2}-\d{3,4}-\d{4}(?:~\d)?/g;
+
+// 아이디·비번 시트: 웹사이트 / 출입 / 구매 사이트 / 전자출입 계정
+function viewAccounts(rows) {
+  rows = rowsOf(rows);
+  const web = [], doors = [], shops = [], gate = [], notes = [];
+  let mode = '';
+  rows.forEach(r => {
+    const a = r[0] || '';
+    if (/^내\s*용$/.test(a)) { mode = 'web'; return; }
+    if (/^구\s*분$/.test(a)) { mode = 'shop'; if (r[3]) notes.push(r[3]); return; }
+    if (/^순번$/.test(a)) { mode = 'gate'; return; }
+    if (/구매 가능/.test(a)) { r.slice(1).filter(Boolean).forEach(x => notes.push(x)); mode = ''; return; }
+    if (/계정 관리|아이디&비번/.test(a) && !r[1]) { return; }
+    if (!r.some(Boolean)) return;
+    if (mode === 'web' && a) (r[1] === '출입' ? doors : web).push(r);
+    else if (mode === 'shop' && a) { shops.push(r); if (r[3]) notes.push(r[3]); }
+    else if (mode === 'gate' && r[2]) gate.push(r);
+  });
+  if (!web.length && !shops.length && !gate.length) return null;
+  const webHtml = web.map(r => `<div><span class="nm">${esc(r[0])}</span><div class="fs">${kv('아이디', r[1])}${kv('비번', r[2])}${r[3] ? kv('주소', r[3], false) : ''}</div></div>`).join('');
+  const shopHtml = shops.map(r => `<div><span class="nm">${esc(r[0])}</span><div class="fs">${kv('아이디', r[1])}${kv('비번', r[2])}</div></div>`).join('');
+  return `<div class="stack">
+    <h2 class="grp">웹사이트</h2><div class="acc">${webHtml}</div>
+    ${doors.length ? `<h2 class="grp">출입 비밀번호</h2><div class="tiles">${doors.map(r => `<div class="tile"><span class="loc">${esc(r[0])}</span><span class="big">${esc(r[2])}</span></div>`).join('')}</div>` : ''}
+    ${shops.length ? `<h2 class="grp">기관 아이디 구매 사이트</h2>${notes.length ? `<p class="notebox">${esc(notes.join(' · '))}</p>` : ''}<div class="acc">${shopHtml}</div>` : ''}
+    ${gate.length ? `<h2 class="grp">전자출입시스템 계정</h2><div class="acc tight">${gate.map(r => `<div><span class="nm">${esc(r[2])}<small>${esc([...new Set([r[1], r[4]].filter(Boolean))].join(' · '))}</small></span><div class="fs">${r[3] ? kv('ID', r[3]) : '<span class="status">계정 없음</span>'}</div></div>`).join('')}</div>` : ''}
+    <p class="status">특별실 공용 PC 비밀번호는 [공용 PC 비밀번호]에 따로 모아 두었습니다.</p></div>`;
+}
+
+// 도어락 — 실마다 타일
+function viewDoors(rows) {
+  rows = rowsOf(rows);
+  const items = rows.filter(r => /^\d+$/.test(r[0]) && r[1] && r[2]);
+  if (!items.length) return null;
+  return `<input class="secsearch" id="secq" type="search" placeholder="실 이름으로 찾기" aria-label="실 이름으로 찾기">
+    <div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">${items.map(r => `<div class="tile" data-f="${esc(r[1])}"><span class="loc">${esc(r[1])}</span><span class="big">${esc(r[2])}</span>${r[3] ? `<span class="sub2">${esc(r[3])}</span>` : ''}</div>`).join('')}</div>`;
+}
+
+// 와이파이 — 학생용 / 교사용 카드
+function viewWifi(rows) {
+  rows = rowsOf(rows);
+  const nets = rows.filter(r => r[0] && /wi_|_class|ssid/i.test(r[0])).map(r => {
+    const m = r[0].match(/^(\S+용)?\s*(\S+)$/);
+    return { who: (m && m[1]) || '', ssid: (m && m[2]) || r[0], pw: r.slice(1).find(Boolean) || '' };
+  });
+  if (!nets.length) return null;
+  const note = (rows.find(r => r[0] && r[0].length > 12 && !nets.some(n => r[0].includes(n.ssid))) || [])[0] || '';
+  return `${note ? `<p class="notebox">${esc(note)}</p>` : ''}<div class="wifi">${nets.map(n => `<div class="card"><h3>${esc(n.who || '와이파이')}</h3>${kv('이름', n.ssid)}${kv('비번', n.pw)}</div>`).join('')}</div>
+    <p class="status">교실에서 '네트워크 추가'로 직접 넣을 때: 보안 EAP 방식 PEAP, CA 인증서 '선택 안 함'</p>`;
+}
+
+// 공용 PC — 실마다 부팅·윈도우 비밀번호
+function viewPCs(rows) {
+  rows = rowsOf(rows);
+  const hi = rows.findIndex(r => r[0] === '소속');
+  if (hi < 0) return null;
+  const note = rows.slice(0, hi).map(r => r.filter(Boolean).join(' ')).join(' ');
+  const seen = new Set();
+  const items = rows.slice(hi + 1).filter(r => r[0] && !seen.has(r.join('|')) && seen.add(r.join('|')));
+  return `${note ? `<p class="notebox">${esc(note)}</p>` : ''}<div class="acc">${items.map(r => `<div><span class="nm">${esc(r[0])}${r[1] ? `<small>${esc(r[1])}</small>` : ''}</span><div class="fs">${kv('부팅', r[2])}${kv('윈도우', r[3])}${r[4] && r[4] !== r[3] ? kv('또는', r[4]) : ''}</div></div>`).join('')}</div>`;
+}
+
+// 비상연락망 — 칸마다 흩어진 이름·번호를 짝지어 목록으로
+function tidyName(t) {
+  const words = t.replace(/[※★]/g, ' ').replace(/^[\s\-–·]+|[\s:：]+$/g, '').replace(/\s+/g, ' ').trim().split(' ');
+  const out = [];
+  words.forEach(w => { const l = out[out.length - 1]; if (l !== undefined && /^[가-힣]$/.test(w) && /^[가-힣]+$/.test(l) && l.length <= 2 && (l.length === 1 || out.single)) out[out.length - 1] = l + w; else out.push(w); out.single = /^[가-힣]$/.test(w); });
+  return out.join(' ').replace(/^([1-6]-[1-9])(?=[가-힣])/, '$1 ');
+}
+function viewContacts(rows) {
+  rows = rowsOf(rows);
+  const out = [];
+  rows.forEach((r, ri) => r.forEach((cell, ci) => {
+    if (!cell || !PHONE.test(cell)) { PHONE.lastIndex = 0; return; }
+    PHONE.lastIndex = 0;
+    let current = '';
+    const above = () => { for (let k = 1; k <= 3; k++) { const v = (rows[ri - k] || [])[ci] || ''; if (v && !PHONE.test(v)) { PHONE.lastIndex = 0; return v; } PHONE.lastIndex = 0; } return ''; };
+    cell.split('\n').forEach(line => {
+      let last = 0, m;
+      const re = new RegExp(PHONE.source, 'g');
+      while ((m = re.exec(line))) {
+        const lab = line.slice(last, m.index);
+        if (lab.replace(/[\s※★\-:：]/g, '')) current = lab;
+        const raw = current || (cell.replace(PHONE, '').trim() ? cell.replace(PHONE, '').split('\n').find(x => x.trim()) : '') || above();
+        out.push({ raw, star: /★/.test(raw), name: tidyName(raw), phone: m[0], ext: /^0(?!10)/.test(m[0]) });
+        last = m.index + m[0].length;
+      }
+      PHONE.lastIndex = 0;
+    });
+  }));
+  if (!out.length) return null;
+  // 같은 이름 아래 번호가 둘이면 한 줄로
+  const merged = [];
+  out.forEach(x => { const p = merged.find(y => y.name === x.name); if (p) p.phones.push(x.phone); else merged.push({ ...x, phones: [x.phone] }); });
+  const groups = [['학교·기관 번호', x => x.ext], ['휴직·파견', x => /휴직|파견|병가/.test(x.raw)], ['담임', x => /^[1-6]-[1-9]/.test(x.name)], ['관리자·교과·직원', () => true]];
+  const used = new Set(), by0 = groups.map(([g, f]) => [g, merged.filter(x => !used.has(x) && f(x) && used.add(x))]);
+  by0[2][1].sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
+  const by = [by0[2], by0[3], by0[0], by0[1]];
+  const role = n => { const m = n.match(/^(.*?)[\s]*\(([^)]*)\)$/); return m ? [m[1], m[2]] : [n, '']; };
+  const note = rows.flat().find(c => /필수요원/.test(c)) || '';
+  return `<input class="secsearch" id="secq" type="search" placeholder="이름, 반, 담당으로 찾기" aria-label="연락처 찾기">
+    ${by.filter(([, l]) => l.length).map(([g, l]) => `<h2 class="grp">${g}</h2><div class="acc tight">${l.map(x => { const [n, r] = role(x.name); return `<div data-f="${esc(x.raw + ' ' + x.name)}"><span class="nm">${esc(n)}${x.star ? ' <span class="pill yes" title="비상 필수요원">★</span>' : ''}${r ? `<small>${esc(r)}</small>` : ''}</span><div class="fs" style="flex-direction:column;align-items:flex-end">${x.phones.map(ph => `<div class="kv"><a href="tel:${ph.replace(/~\d$/, '')}"><code>${esc(ph)}</code></a></div>`).join('')}</div></div>`; }).join('')}</div>`).join('')}
+    ${note ? `<p class="status">${esc(note.replace(/^★\s*표시는\s*/, '★ '))}</p>` : ''}`;
+}
+
+const SEC_VIEWS = [[/아이디/, viewAccounts], [/도어락/, viewDoors], [/와이파이|학내망/, viewWifi], [/연락망/, viewContacts], [/PC/, viewPCs]];
+function secBody(t) {
+  const f = (SEC_VIEWS.find(([re]) => re.test(t.name)) || [])[1];
+  if (f) { try { const h = f(t.rows); if (h) return h; } catch (e) { console.warn(t.name, e); } }
+  return tableHTML(t.rows);
+}
+$('#view').addEventListener('click', async e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = '복사됨'; b.classList.add('done'); setTimeout(() => { b.textContent = '복사'; b.classList.remove('done'); }, 1500); }
+  catch { const r = document.createRange(); const c = b.previousElementSibling; if (c) { r.selectNodeContents(c); getSelection().removeAllRanges(); getSelection().addRange(r); } }
+});
+$('#view').addEventListener('input', e => {
+  if (e.target.id !== 'secq') return;
+  const q = norm(e.target.value);
+  document.querySelectorAll('#view [data-f]').forEach(el => { el.hidden = q && !norm(el.dataset.f).includes(q); });
+  document.querySelectorAll('#view .acc').forEach(a => { const h = a.previousElementSibling; const any = [...a.children].some(c => !c.hidden); a.hidden = !any; if (h && h.classList.contains('grp')) h.hidden = !any; });
 });
 
 /* ---------- 그리기 ---------- */
