@@ -52,3 +52,24 @@ export function weeklyDigest(events, groups, today = kstToday()) {
     url: `/?d=${days[0]}`, tag: `weekly-${days[0]}`,
   };
 }
+
+// 수합·공지 알림 문구 — 담당 선생님이 [알림 보내기]를 눌렀을 때
+import { classesFrom, targetsOf } from './parse.js';
+const md = d => `${+d.slice(5, 7)}.${+d.slice(8)}`;
+export function collectPushMsg(item, cls, today = kstToday()) {
+  const t = ymd(today);
+  const when = item.due === t ? '오늘 마감' : item.due < t ? `마감 지남(${md(item.due)})` : `마감 ${fmtDate(item.due)}`;
+  return {
+    title: `[수합] ${item.title}`,
+    body: `${cls} 아직 체크 전 · ${when}${item.by ? ' · ' + item.by : ''}\n제출하셨으면 사이트에서 우리 반을 체크해 주세요.`,
+    url: `/?tab=collect#c-${item.id}`, tag: `collect-${item.id}`,
+  };
+}
+export function noticePushMsg(n) {
+  return {
+    title: `[공지] ${n.title}`,
+    body: `${md(n.date)}${n.by ? ' · ' + n.by : ''}${n.body ? '\n' + n.body.replace(/\s+/g, ' ').slice(0, 120) : ''}`,
+    url: `/?tab=notice#n-${n.id}`, tag: `notice-${n.id}`,
+  };
+}
+export { classesFrom, targetsOf };

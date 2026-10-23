@@ -126,3 +126,22 @@ export function fmtDate(s) {
   const dt = new Date(y, m - 1, d);
   return `${m}.${d}(${WEEK[dt.getDay()]})`;
 }
+
+// 학급 목록 — 내선번호 탭의 "6 - 1" 같은 칸에서 자동으로 만듭니다. (시트에 반이 늘면 따라서 늘어남)
+export function classesFrom(pub) {
+  const set = new Set();
+  for (const t of pub?.tables || []) {
+    if (!/내선|인터폰/.test(t.name)) continue;
+    for (const r of t.rows) for (const c of r) {
+      const m = String(c).match(/^\s*([1-6])\s*-\s*([1-9])\s*$/);
+      if (m) set.add(`${m[1]}-${m[2]}`);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, 'ko', { numeric: true }));
+}
+
+// 이 수합의 대상 학급
+export function targetsOf(item, classes) {
+  const g = item.grades || [];
+  return g.length ? classes.filter(c => g.includes(c.split('-')[0])) : classes;
+}
